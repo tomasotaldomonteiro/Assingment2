@@ -3,6 +3,10 @@ using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
+    [Header("Health Settings")]
+    public float maxHealth = 100f;
+    private float currentHealth;
+
     public float slowedSpeed = 1.5f;
     public float normalSpeed = 5f;
     private float currentSpeed;
@@ -16,6 +20,17 @@ public class PlayerController : MonoBehaviour
        private Vector2 movement;
        private Vector2 facingDirection = Vector2.right;
    
+       void Awake()
+       {
+           // Initialize health early so UI can read the correct value in its Start
+           currentHealth = maxHealth;
+            // If UIManager is present, force it to show the initial health number immediately
+            if (UIManager.instance != null)
+            {
+                UIManager.instance.SetHealthNumber(currentHealth);
+            }
+       }
+
        void Start()
        {
            rb = GetComponent<Rigidbody2D>();
@@ -56,7 +71,7 @@ public class PlayerController : MonoBehaviour
    
        void FixedUpdate()
        {
-           rb.velocity = movement * currentSpeed;
+           rb.linearVelocity = movement * currentSpeed;
        }
        
        void Shoot()
@@ -68,7 +83,7 @@ public class PlayerController : MonoBehaviour
                );
        
                Rigidbody2D bulletRb = bullet.GetComponent<Rigidbody2D>();
-               bulletRb.velocity = facingDirection * bulletSpeed;
+               bulletRb.linearVelocity = facingDirection * bulletSpeed;
            }
        
            private void OnTriggerEnter2D(Collider2D other)
@@ -88,5 +103,48 @@ public class PlayerController : MonoBehaviour
                    Debug.Log(" changing speed");
                    currentSpeed = normalSpeed;
                }
+           }
+
+           public void TakeDamage(float damage)
+           {
+               currentHealth -= damage;
+               Debug.Log($"Player took {damage} damage. Remaining health: {currentHealth}");
+
+               // Notify the UI manager
+               if (UIManager.instance != null)
+               {
+                   UIManager.instance.UpdateHealthDisplay();
+               }
+
+               // Check if player is dead
+               if (currentHealth <= 0)
+               {
+                   Die();
+               }
+           }
+
+         
+           public float GetHealth()
+           {
+               return currentHealth;
+           }
+
+         
+           public float GetMaxHealth()
+           {
+               return maxHealth;
+           }
+
+      
+           void Die()
+           {
+               Debug.Log("Player died!");
+                      gameObject.SetActive(false);
+
+                      // Show death UI
+                      if (UIManager.instance != null)
+                      {
+                          UIManager.instance.ShowDeathScreen();
+                      }
            }
 }
