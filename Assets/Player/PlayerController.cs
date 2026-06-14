@@ -54,19 +54,12 @@ public class PlayerController : MonoBehaviour
                Shoot();
            }
            
-           if (movement != Vector2.zero)
-           {
-               facingDirection = movement;
-
-               if (facingDirection.x > 0)
-                   ShootingPoint.localPosition = new Vector3(0.5f, 0f, 0f);
-               else if (facingDirection.x < 0)
-                   ShootingPoint.localPosition = new Vector3(-0.5f, 0f, 0f);
-               else if (facingDirection.y > 0)
-                   ShootingPoint.localPosition = new Vector3(0f, 0.5f, 0f);
-               else if (facingDirection.y < 0)
-                   ShootingPoint.localPosition = new Vector3(0f, -0.5f, 0f);
-           }
+           UpdateShootingPoint();
+           
+       }
+       void UpdateShootingPoint()
+       {
+           ShootingPoint.localPosition = facingDirection * 0.5f;
        }
    
        void FixedUpdate()
@@ -75,16 +68,20 @@ public class PlayerController : MonoBehaviour
        }
        
        void Shoot()
-           {
-               GameObject bullet = Instantiate(
-                   bulletPrefab,
-                   ShootingPoint.position,
-                   Quaternion.identity
-               );
-       
-               Rigidbody2D bulletRb = bullet.GetComponent<Rigidbody2D>();
-               bulletRb.linearVelocity = facingDirection * bulletSpeed;
-           }
+       {
+           Vector2 dir = facingDirection.normalized;
+
+           Vector2 spawnPos = (Vector2)transform.position + dir * 0.6f;
+
+           GameObject bullet = Instantiate(
+               bulletPrefab,
+               spawnPos,
+               Quaternion.identity
+           );
+
+           Rigidbody2D rb = bullet.GetComponent<Rigidbody2D>();
+           rb.linearVelocity = dir * bulletSpeed;
+       }
        
            private void OnTriggerEnter2D(Collider2D other)
            {
