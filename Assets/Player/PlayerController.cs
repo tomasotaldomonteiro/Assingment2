@@ -10,6 +10,7 @@ public class PlayerController : MonoBehaviour
     public float slowedSpeed = 1.5f;
     public float normalSpeed = 5f;
     private float currentSpeed;
+    public Transform Sprite;
    
     //Bullet Stuff
     public GameObject bulletPrefab;
@@ -47,9 +48,16 @@ public class PlayerController : MonoBehaviour
            {
               facingDirection = movement;
            }
+           
+           // Sprite Rotation.
+           if (facingDirection != Vector2.zero)
+           {
+               float angle = Mathf.Atan2(facingDirection.y, facingDirection.x) * Mathf.Rad2Deg;
+               Sprite.localRotation = Quaternion.Euler(0f, 0f, angle - 90);
+           }
                       
                               
-           if (Input.GetKeyDown(KeyCode.Space))
+           if (Input.GetKeyDown(KeyCode.Mouse0))
            { 
                Shoot();
            }
@@ -81,6 +89,10 @@ public class PlayerController : MonoBehaviour
 
            Rigidbody2D rb = bullet.GetComponent<Rigidbody2D>();
            rb.linearVelocity = dir * bulletSpeed;
+           
+           // Rotates the Bullet.
+           float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+           bullet.transform.rotation = Quaternion.Euler(0f, 0f, angle - 90);
        }
        
            private void OnTriggerEnter2D(Collider2D other)
