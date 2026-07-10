@@ -16,10 +16,24 @@ public class PlayerController : MonoBehaviour
     public GameObject bulletPrefab;
     public Transform ShootingPoint;
     public float bulletSpeed = 10f;
+
+    [Header("Phone / Mobile Input")]
+    [Tooltip("Enable on-screen phone controls / touch input")]
+    public bool enablePhoneInput = true;
+    [Tooltip("How far a touch must move (pixels) to count as full movement")]
+    public float touchMoveDistance = 120f;
     
        private Rigidbody2D rb;
        private Vector2 movement;
        private Vector2 facingDirection = Vector2.right;
+        private Vector2 _touchMovement;
+        private int _movementTouchId = -1;
+        private Vector2 _movementTouchStart;
+        private bool _moveUpPressed;
+        private bool _moveDownPressed;
+        private bool _moveLeftPressed;
+        private bool _moveRightPressed;
+        private bool _shootRequested;
    
        void Awake()
        {
@@ -40,10 +54,7 @@ public class PlayerController : MonoBehaviour
    
        void Update()
        {
-           movement.x = Input.GetAxisRaw("Horizontal");
-           movement.y = Input.GetAxisRaw("Vertical");
-   
-           movement = movement.normalized;
+            movement = ReadMovementInput();
            if (movement != Vector2.zero)
            {
               facingDirection = movement;
@@ -56,8 +67,13 @@ public class PlayerController : MonoBehaviour
                Sprite.localRotation = Quaternion.Euler(0f, 0f, angle - 90);
            }
                       
-                              
-           if (Input.GetKeyDown(KeyCode.Mouse0))
+            bool shootInput = Input.GetKeyDown(KeyCode.Mouse0);
+            if (ConsumeShootRequest())
+            {
+                shootInput = true;
+            }
+
+            if (shootInput)
            { 
                Shoot();
            }
@@ -69,6 +85,134 @@ public class PlayerController : MonoBehaviour
        {
            ShootingPoint.localPosition = facingDirection * 0.5f;
        }
+
+        public void SetMoveUp(bool pressed)
+        {
+            _moveUpPressed = pressed;
+        }
+
+        public void SetMoveDown(bool pressed)
+        {
+            _moveDownPressed = pressed;
+        }
+
+        public void SetMoveLeft(bool pressed)
+        {
+            _moveLeftPressed = pressed;
+        }
+
+        public void SetMoveRight(bool pressed)
+        {
+            _moveRightPressed = pressed;
+        }
+
+        public void RequestShoot()
+        {
+            _shootRequested = true;
+        }
+
+        private Vector2 ReadMovementInput()
+        {
+            Vector2 buttonMovement = new Vector2(
+                (_moveRightPressed ? 1f : 0f) - (_moveLeftPressed ? 1f : 0f),
+                (_moveUpPressed ? 1f : 0f) - (_moveDownPressed ? 1f : 0f)
+            );
+
+            if (buttonMovement != Vector2.zero)
+            {
+                return buttonMovement.normalized;
+            }
+
+            if (enablePhoneInput && Input.touchSupported)
+            {
+                ReadTouchInput();
+
+                if (_movementTouchId != -1)
+                {
+                    return _touchMovement;
+                }
+            }
+
+            Vector2 keyboardMovement = new Vector2(
+                Input.GetAxisRaw("Horizontal"),
+                Input.GetAxisRaw("Vertical")
+            );
+
+            return keyboardMovement.normalized;
+        }
+
+        private void ReadTouchInput()
+        {
+            _touchMovement = Vector2.zero;
+
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                Touch touch = Input.GetTouch(i);
+
+                if (_movementTouchId == -1 && touch.phase == TouchPhase.Began && touch.position.x <= Screen.width * 0.5f)
+                {
+                    _movementTouchId = touch.fingerId;
+                    _movementTouchStart = touch.position;
+                }
+
+                if (touch.fingerId == _movementTouchId)
+                {
+                    Vector2 delta = touch.position - _movementTouchStart;
+                    _touchMovement = Vector2.ClampMagnitude(delta / Mathf.Max(1f, touchMoveDistance), 1f);
+
+                    if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
+                    {
+                        _movementTouchId = -1;
+                        _touchMovement = Vector2.zero;
+                    }
+
+                    continue;
+                }
+
+                if (touch.phase == TouchPhase.Began && touch.position.x > Screen.width * 0.5f)
+                {
+                    _shootRequested = true;
+                }
+            }
+        }
+
+        private bool ConsumeShootRequest()
+        {
+            if (!_shootRequested)
+            {
+                return false;
+            }
+
+            _shootRequested = false;
+            return true;
+        }
+
+        private void OnGUI()
+        {
+            if (!enablePhoneInput || !Input.touchSupported)
+            {
+                return;
+            }
+
+            float buttonSize = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) * 0.18f, 120f, 220f);
+            float margin = Mathf.Clamp(buttonSize * 0.2f, 20f, 40f);
+            Rect shootRect = new Rect(
+                Screen.width - buttonSize - margin,
+                Screen.height - buttonSize - margin,
+                buttonSize,
+                buttonSize
+            );
+
+            Color previousColor = GUI.color;
+            GUI.color = new Color(1f, 0.45f, 0.2f, 0.85f);
+
+            if (GUI.Button(shootRect, "SHOOT"))
+            {
+                RequestShoot();
+            }
+
+            GUI.color = previousColor;
+        }
    
        void FixedUpdate()
        {
@@ -87,8 +231,8 @@ public class PlayerController : MonoBehaviour
                Quaternion.identity
            );
 
-           Rigidbody2D rb = bullet.GetComponent<Rigidbody2D>();
-           rb.linearVelocity = dir * bulletSpeed;
+            Rigidbody2D bulletRb = bullet.GetComponent<Rigidbody2D>();
+            bulletRb.linearVelocity = dir * bulletSpeed;
            
            // Rotates the Bullet.
            float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
