@@ -2,22 +2,29 @@ using UnityEngine;
 
 public class DoorScript : MonoBehaviour
 {
-    public KeyScriptableObject[] requiredKeys;
-
-    public Vector3 openPosition;
-    public Vector3 openRotation;
+    [SerializeField] private KeyScriptableObject[] requiredKeys;
+    [SerializeField] private Vector3 openPosition;
+    [SerializeField] private Vector3 openRotation;
 
     private bool opened;
 
     private void OnCollisionEnter2D(Collision2D collision)
     {
         if (opened)
+        {
             return;
+        }
 
-        PlayerInventory inventory = collision.collider.GetComponent<PlayerInventory>();
-
-        if (inventory == null)
+        if (!collision.collider.TryGetComponent(out PlayerInventory inventory))
+        {
             return;
+        }
+
+        if (requiredKeys == null || requiredKeys.Length == 0)
+        {
+            OpenDoor();
+            return;
+        }
 
         foreach (KeyScriptableObject key in requiredKeys)
         {
@@ -28,11 +35,9 @@ public class DoorScript : MonoBehaviour
         OpenDoor();
     }
 
-    void OpenDoor()
+    private void OpenDoor()
     {
         opened = true;
-
-        transform.position = openPosition;
-        transform.rotation = Quaternion.Euler(openRotation);
+        transform.SetPositionAndRotation(openPosition, Quaternion.Euler(openRotation));
     }
 }

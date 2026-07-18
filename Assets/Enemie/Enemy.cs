@@ -1,83 +1,90 @@
+using System;
 using UnityEngine;
 
+[RequireComponent(typeof(Rigidbody2D))]
 public class Enemy : MonoBehaviour
 {
-    [Header("Health Settings")] public float maxHealth = 30f;
+    public event Action Died;
+
+    [Header("Health Settings")]
+    [SerializeField] private float maxHealth = 30f;
     private float currentHealth;
 
-    [Header("Damage Settings")] public float damageToPlayer = 10f;
-    public float damageCooldown = 1f; 
+    [Header("Damage Settings")]
+    [SerializeField] private float damageToPlayer = 10f;
+    [SerializeField] private float damageCooldown = 1f;
     private float lastDamageTime = 0f;
 
-    [Header("Respawn Settings")] public GameObject enemyPrefab; 
-    public float spawnDelay = 2f; 
-    private Vector3 spawnPosition;
-
     [Header("Movement Settings")]
-    public float moveSpeed = 3f; // Speed at which enemy moves towards player
-    public float detectionRange = 15f; // Range at which enemy can see the player
-    
+    [SerializeField] private float moveSpeed = 3f;
+    [SerializeField] private float detectionRange = 15f;
+
     private Rigidbody2D rb;
     private bool isDead = false;
     private Transform playerTransform;
 
-    void Start()
+    private void Awake()
     {
-        currentHealth = maxHealth;
         rb = GetComponent<Rigidbody2D>();
-        
-        
-        // Find the player
+        currentHealth = maxHealth;
+    }
+
+    private void Start()
+    {
         GameObject player = GameObject.FindGameObjectWithTag("Player");
-        if (player != null)
-        {
-            playerTransform = player.transform;
-        }
-        else
+        if (player == null)
         {
             Debug.LogWarning("Player not found! Make sure the player has the 'Player' tag.");
+            return;
         }
+
+        playerTransform = player.transform;
     }
 
-    void Update()
+    private void FixedUpdate()
     {
-        if (isDead) return;
-
-        // Follow the player if they're in detection range
-        if (playerTransform != null)
+        if (isDead)
         {
-            float distanceToPlayer = Vector3.Distance(transform.position, playerTransform.position);
-            
-            if (distanceToPlayer <= detectionRange)
-            {
-                FollowPlayer();
-            }
-            else
-            {
-                // Stop moving if player is out of range
-                if (rb != null)
-                {
-                    rb.linearVelocity = Vector2.zero;
-                }
-            }
+            return;
         }
-    }
-    
 
-    void FollowPlayer()
+        if (playerTransform == null || rb == null)
+        {
+            return;
+        }
+
+        float distanceToPlayer = Vector3.Distance(transform.position, playerTransform.position);
+        if (distanceToPlayer <= detectionRange)
+        {
+            FollowPlayer();
+            return;
+        }
+
+        rb.linearVelocity = Vector2.zero;
+    }
+
+    private void FollowPlayer()
     {
-        if (playerTransform == null || rb == null) return;
-        
-        // Calculate direction to player
+        if (playerTransform == null || rb == null)
+        {
+            return;
+        }
+
         Vector2 direction = (playerTransform.position - transform.position).normalized;
-        
-        // Move towards player
         rb.linearVelocity = direction * moveSpeed;
     }
 
     public void TakeDamage(float damage)
     {
-        if (isDead) return;
+        if (isDead)
+        {
+            return;
+        }
+
+        if (damage <= 0f)
+        {
+            return;
+        }
 
         currentHealth -= damage;
         Debug.Log($"Enemy took {damage} damage. Remaining health: {currentHealth}");
@@ -89,10 +96,10 @@ public class Enemy : MonoBehaviour
     }
 
 
-    void Die()
+    private void Die()
     {
         isDead = true;
-        Debug.Log("Enemy died!");
+        Died?.Invoke();
         gameObject.SetActive(false);
     }
 
@@ -100,7 +107,6 @@ public class Enemy : MonoBehaviour
     {
         if (other.CompareTag("Player"))
         {
-            // Check if enough time has passed since last damage
             if (Time.time - lastDamageTime >= damageCooldown)
             {
                 DamagePlayer(other);
@@ -110,11 +116,9 @@ public class Enemy : MonoBehaviour
     }
 
 
-    void DamagePlayer(Collider2D playerCollider)
+    private void DamagePlayer(Collider2D playerCollider)
     {
-        PlayerController playerController = playerCollider.GetComponent<PlayerController>();
-
-        if (playerController != null)
+        if (playerCollider.TryGetComponent(out PlayerController playerController))
         {
             Debug.Log($"Player hit! Taking {damageToPlayer} damage");
             playerController.TakeDamage(damageToPlayer);

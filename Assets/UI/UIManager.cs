@@ -1,134 +1,111 @@
 ﻿using UnityEngine;
-// using UnityEngine.UI; // no longer used because we only show text
 using TMPro;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 
 public class UIManager : MonoBehaviour
 {
-    public static UIManager instance;
-    
     [Header("Health UI")]
-    public TextMeshProUGUI healthText; // Text to display current health number
+    [SerializeField] private TextMeshProUGUI healthText;
     [Tooltip("Value to show on the UI before the player is found")]
-    public float initialHealth = 100f;
+    [SerializeField] private float initialHealth = 100f;
 
     [Header("Death UI")]
     [Tooltip("Assign a UI panel (GameObject) to show when the player dies")]
-    public GameObject deathScreen;
-    
-    private PlayerController playerController;
-    
-    void Awake()
-    {
-        // Singleton pattern
-        if (instance == null)
-        {
-            instance = this;
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
+    [SerializeField] private GameObject deathScreen;
 
-        // Ensure the UI shows a sensible initial health value immediately
+    private PlayerController playerController;
+
+    private void Awake()
+    {
         if (healthText != null)
         {
             healthText.text = $"Health: {initialHealth:F0}";
         }
 
-        // If no deathScreen assigned in the Inspector, create a default one at runtime
         if (deathScreen == null)
         {
             CreateDefaultDeathScreen();
         }
     }
-    
-    void Start()
+
+    private void Start()
     {
-        // Find the player (safe lookup)
+        BindPlayer();
+    }
+
+    private void OnDisable()
+    {
+        UnbindPlayer();
+    }
+
+    private void Update()
+    {
+        if (deathScreen != null && deathScreen.activeSelf && Input.GetKeyDown(KeyCode.Space))
+        {
+            RestartScene();
+        }
+    }
+
+    private void BindPlayer()
+    {
+        UnbindPlayer();
+
         GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
-        if (playerObj != null)
+        if (playerObj == null)
         {
-            playerController = playerObj.GetComponent<PlayerController>();
+            Debug.LogWarning("PlayerController not found at UIManager.Start.");
+            return;
         }
 
-        if (playerController == null)
+        if (!playerObj.TryGetComponent(out PlayerController controller))
         {
-            Debug.LogWarning("PlayerController not found at UIManager.Start. Health text will update when player becomes available.");
+            Debug.LogWarning("Player object is missing PlayerController.");
+            return;
         }
 
-        // Initialize health display: show player's actual health if available, otherwise show the configured initial value
-        if (playerController != null)
-        {
-            UpdateHealthDisplay();
-        }
-        else
-        {
-            if (healthText != null)
-                healthText.text = $"Health: {initialHealth:F0}";
-            else
-                Debug.Log($"Initial player health: {initialHealth:F0}");
-        }
+        playerController = controller;
+        playerController.HealthChanged += HandleHealthChanged;
+        playerController.Died += HandlePlayerDied;
+
+        HandleHealthChanged(playerController.GetHealth(), playerController.GetMaxHealth());
     }
 
-    void Update()
+    private void UnbindPlayer()
     {
-        // If the playerController wasn't available at Start, try to find it each frame until found
         if (playerController == null)
         {
-            GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
-            if (playerObj != null)
-            {
-                playerController = playerObj.GetComponent<PlayerController>();
-                if (playerController != null)
-                {
-                    UpdateHealthDisplay();
-                }
-            }
+            return;
         }
 
-        // If death screen active and player presses Space, restart
-        if (deathScreen != null && deathScreen.activeSelf)
-        {
-            if (Input.GetKeyDown(KeyCode.Space))
-            {
-                RestartScene();
-            }
-        }
+        playerController.HealthChanged -= HandleHealthChanged;
+        playerController.Died -= HandlePlayerDied;
+        playerController = null;
     }
-    
+
+    private void HandleHealthChanged(float currentHealth, float maxHealth)
+    {
+        if (healthText != null)
+        {
+            healthText.text = $"Health: {currentHealth:F0}";
+            return;
+        }
+
+        Debug.Log($"Player health: {currentHealth:F0}/{maxHealth:F0}");
+    }
 
     public void UpdateHealthDisplay()
     {
         if (playerController == null) return;
 
-        float currentHealth = playerController.GetHealth();
-
-        // Update health text to show only the number (rounded)
-        if (healthText != null)
-        {
-            healthText.text = $"Health: {currentHealth:F0}";
-        }
-        else
-        {
-            Debug.Log($"Player health: {currentHealth:F0}");
-        }
+        HandleHealthChanged(playerController.GetHealth(), playerController.GetMaxHealth());
     }
 
-    public void SetHealthNumber(float health)
+    private void HandlePlayerDied()
     {
-        if (healthText != null)
-        {
-            healthText.text = $"Health: {health:F0}";
-        }
-        else
-        {
-            Debug.Log($"Player health (forced): {health:F0}");
-        }
+        ShowDeathScreen();
     }
 
-  
     public void ShowDeathScreen()
     {
         if (deathScreen != null)
@@ -151,17 +128,14 @@ public class UIManager : MonoBehaviour
         Time.timeScale = 1f;
     }
 
-   
     public void RestartScene()
     {
         Time.timeScale = 1f;
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 
- 
     private void CreateDefaultDeathScreen()
     {
-        // Try to find existing Canvas
         Canvas canvas = FindObjectOfType<Canvas>();
         GameObject canvasGO;
         if (canvas != null)
@@ -170,7 +144,6 @@ public class UIManager : MonoBehaviour
         }
         else
         {
-            // Create a new Canvas
             canvasGO = new GameObject("Canvas");
             canvas = canvasGO.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -178,7 +151,6 @@ public class UIManager : MonoBehaviour
             canvasGO.AddComponent<GraphicRaycaster>();
         }
 
-        // Create panel
         GameObject panel = new GameObject("DeathScreen");
         panel.transform.SetParent(canvasGO.transform, false);
         RectTransform rt = panel.AddComponent<RectTransform>();
@@ -188,9 +160,8 @@ public class UIManager : MonoBehaviour
         rt.offsetMax = Vector2.zero;
 
         Image img = panel.AddComponent<Image>();
-        img.color = new Color(0f, 0f, 0f, 0.75f); // black with 75% opacity
+        img.color = new Color(0f, 0f, 0f, 0.75f);
 
-        // Create centered TextMeshProUGUI
         GameObject txtGO = new GameObject("DeathText");
         txtGO.transform.SetParent(panel.transform, false);
         RectTransform txtRt = txtGO.AddComponent<RectTransform>();
@@ -205,10 +176,8 @@ public class UIManager : MonoBehaviour
         tmp.fontSize = 36;
         tmp.color = Color.white;
 
-        // Ensure it's inactive by default
         panel.SetActive(false);
 
         deathScreen = panel;
     }
 }
-

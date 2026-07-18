@@ -1,26 +1,27 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
 public class MainMenu : MonoBehaviour
 {
+    [SerializeField] private string levelSceneName = "LevelScene";
+    [SerializeField] private string mainMenuSceneName = "MainMenu";
+
     public void PlayGame()
     {
-        SceneManager.LoadScene("LevelScene"); 
+        SceneManager.LoadScene(levelSceneName);
     }
-         
+
     public void QuitGame()
     {
 #if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;
 #else
-                Application.Quit();
+        Application.Quit();
 #endif
     }
-    
+
     public void BackToMenu()
     {
-        SceneManager.LoadScene("MainMenu");
+        SceneManager.LoadScene(mainMenuSceneName);
     }
 }

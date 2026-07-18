@@ -1,26 +1,26 @@
-﻿using UnityEngine;
+using System.Collections;
+using UnityEngine;
 
 public class EnemyManager : MonoBehaviour
 {
     [Header("Enemy Spawn Settings")]
-    public GameObject enemyPrefab; // The enemy prefab to spawn
-    public float spawnRadius = 10f; // Radius around center to spawn enemies
-    public Vector3 spawnCenter = Vector3.zero; // Center point for random spawning
-    
+    [SerializeField] private GameObject enemyPrefab;
+    [SerializeField] private float spawnRadius = 10f;
+    [SerializeField] private Vector3 spawnCenter = Vector3.zero;
+
     [Header("Player Reference")]
-    public GameObject playerObject; // Reference to the player to avoid spawning on top
-    public float minDistanceFromPlayer = 2f; // Minimum distance to spawn from player
-    
+    [SerializeField] private GameObject playerObject;
+    [SerializeField] private float minDistanceFromPlayer = 2f;
+
     [Header("Respawn Settings")]
-    public float spawnDelay = 2f; // Delay before respawning
-    
+    [SerializeField] private float spawnDelay = 2f;
+
     private GameObject currentEnemy;
     private Enemy currentEnemyScript;
-    private bool isRespawning = false; // Flag to prevent multiple spawns
-    
-    void Start()
+    private Coroutine respawnRoutine;
+
+    private void Start()
     {
-        // Auto-find player if not assigned
         if (playerObject == null)
         {
             playerObject = GameObject.FindGameObjectWithTag("Player");
@@ -29,78 +29,98 @@ public class EnemyManager : MonoBehaviour
                 Debug.LogWarning("Player not found! Make sure the player GameObject has the 'Player' tag.");
             }
         }
-        
-        // Spawn the initial enemy
+
         SpawnEnemy();
     }
-    
-    void Update()
-    {
-        // Check if current enemy is dead or doesn't exist
-        if ((currentEnemy == null || !currentEnemy.activeInHierarchy) && !isRespawning)
-        {
-            Debug.Log("Enemy is dead or missing! Respawning...");
-            isRespawning = true;
-            Invoke(nameof(SpawnEnemy), spawnDelay);
-        }
-    }
-    
 
-    void SpawnEnemy()
+    private void OnDisable()
     {
-        if (enemyPrefab != null)
-        {
-            Vector3 spawnPosition = GetRandomSpawnPosition();
-            
-            currentEnemy = Instantiate(enemyPrefab, spawnPosition, Quaternion.identity);
-            currentEnemyScript = currentEnemy.GetComponent<Enemy>();
-            
-            if (currentEnemyScript == null)
-            {
-                Debug.LogWarning("Enemy prefab does not have an Enemy script attached!");
-            }
-            
-            isRespawning = false; // Reset flag after spawning
-            Debug.Log("Enemy spawned at: " + spawnPosition);
-        }
-        else
+        UnsubscribeCurrentEnemy();
+    }
+
+    private void SpawnEnemy()
+    {
+        if (enemyPrefab == null)
         {
             Debug.LogError("Enemy prefab is not assigned in the Inspector!");
+            return;
         }
-    }
-    
- 
-    Vector3 GetRandomSpawnPosition()
-    {
-        Vector3 randomPosition = Vector3.zero;
-        bool validPosition = false;
-        
-        // Keep generating random positions until we find one that's not on the player
-        while (!validPosition)
+
+        if (currentEnemyScript != null)
         {
-            // Generate random position within spawn radius
+            currentEnemyScript.Died -= HandleEnemyDied;
+        }
+
+        Vector3 spawnPosition = GetRandomSpawnPosition();
+        currentEnemy = Instantiate(enemyPrefab, spawnPosition, Quaternion.identity);
+        currentEnemyScript = currentEnemy.GetComponent<Enemy>();
+
+        if (currentEnemyScript == null)
+        {
+            Debug.LogWarning("Enemy prefab does not have an Enemy script attached!");
+            return;
+        }
+
+        currentEnemyScript.Died += HandleEnemyDied;
+        Debug.Log("Enemy spawned at: " + spawnPosition);
+    }
+
+    private void HandleEnemyDied()
+    {
+        if (respawnRoutine != null)
+        {
+            StopCoroutine(respawnRoutine);
+        }
+
+        respawnRoutine = StartCoroutine(RespawnEnemyRoutine());
+    }
+
+    private void UnsubscribeCurrentEnemy()
+    {
+        if (currentEnemyScript != null)
+        {
+            currentEnemyScript.Died -= HandleEnemyDied;
+            currentEnemyScript = null;
+        }
+
+        currentEnemy = null;
+    }
+
+    private IEnumerator RespawnEnemyRoutine()
+    {
+        yield return new WaitForSeconds(spawnDelay);
+        SpawnEnemy();
+        respawnRoutine = null;
+    }
+
+    private Vector3 GetRandomSpawnPosition()
+    {
+        const int maxAttempts = 20;
+
+        for (int attempt = 0; attempt < maxAttempts; attempt++)
+        {
             float randomAngle = Random.Range(0f, 360f);
             float randomDistance = Random.Range(0f, spawnRadius);
-            
-            randomPosition = spawnCenter + new Vector3(
+
+            Vector3 randomPosition = spawnCenter + new Vector3(
                 Mathf.Cos(randomAngle * Mathf.Deg2Rad) * randomDistance,
                 Mathf.Sin(randomAngle * Mathf.Deg2Rad) * randomDistance,
                 0f
             );
-            
-            // Check if position is far enough from player
-            if (playerObject != null)
+
+            if (playerObject == null)
             {
-                float distanceToPlayer = Vector3.Distance(randomPosition, playerObject.transform.position);
-                validPosition = distanceToPlayer >= minDistanceFromPlayer;
+                return randomPosition;
             }
-            else
+
+            float distanceToPlayer = Vector3.Distance(randomPosition, playerObject.transform.position);
+            if (distanceToPlayer >= minDistanceFromPlayer)
             {
-                // If no player reference, just accept the position
-                validPosition = true;
+                return randomPosition;
             }
         }
-        
-        return randomPosition;
+
+        Debug.LogWarning("Could not find a valid enemy spawn position near the requested center.");
+        return spawnCenter;
     }
 }

@@ -1,29 +1,28 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
+[RequireComponent(typeof(Rigidbody2D))]
 public class Bullet : MonoBehaviour
 {
-    public float lifeTime = 3f;
+    [SerializeField] private float lifeTime = 3f;
+    [SerializeField] private float damage = 10f;
 
-    void Start()
+    private void Start()
     {
         Destroy(gameObject, lifeTime);
     }
+
     private void OnCollisionEnter2D(Collision2D collision)
     {
-        
-        if (collision.gameObject.CompareTag("Enemie"))
+        if (collision.collider.TryGetComponent(out Enemy enemy))
         {
-            Destroy(collision.gameObject);
-            Destroy(this.gameObject);
+            enemy.TakeDamage(damage);
+            Destroy(gameObject);
+            return;
         }
-        
+
         if (collision.gameObject.CompareTag("Wall"))
         {
-            Destroy(this.gameObject);
+            Destroy(gameObject);
         }
     }
-    
-    
 }
