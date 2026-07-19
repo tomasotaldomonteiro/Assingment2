@@ -9,6 +9,8 @@ public class Enemy : MonoBehaviour
     [Header("Health Settings")]
     [SerializeField] private float maxHealth = 30f;
     private float currentHealth;
+    private SpriteRenderer spriteRenderer;
+    [SerializeField] private Transform spriteTransform;
 
     [Header("Damage Settings")]
     [SerializeField] private float damageToPlayer = 10f;
@@ -27,6 +29,7 @@ public class Enemy : MonoBehaviour
     {
         rb = GetComponent<Rigidbody2D>();
         currentHealth = maxHealth;
+        spriteRenderer = GetComponentInChildren<SpriteRenderer>();
     }
 
     private void Start()
@@ -72,6 +75,10 @@ public class Enemy : MonoBehaviour
 
         Vector2 direction = (playerTransform.position - transform.position).normalized;
         rb.linearVelocity = direction * moveSpeed;
+        
+        float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+
+        spriteTransform.rotation = Quaternion.Euler(0, 0, angle);
     }
 
     public void TakeDamage(float damage)
@@ -99,8 +106,7 @@ public class Enemy : MonoBehaviour
     private void Die()
     {
         isDead = true;
-        Died?.Invoke();
-        gameObject.SetActive(false);
+        Destroy(gameObject);
     }
 
     private void OnTriggerStay2D(Collider2D other)
